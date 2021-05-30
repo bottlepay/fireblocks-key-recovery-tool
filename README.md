@@ -13,6 +13,14 @@
 * Private key `<key.pem>`
 * Passphrase
 
+## YubiHSM Support
+
+Decryption operations may utilise RSA private keys stored on a YubiHSM device.
+
+This functionality is enabled by setting the `--yubihsm-url` flag to either a yubihsm-connector URL or USB device connection string.
+The Authentication Key ID to use may be set using `--yubihsm-authkey`, which defaults to `1`.
+
+Once YubiHSM mode is enabled, parameters that normally expect a local private key PEM path will instead treat the value as an Asymmetric Key ID.
 
 ## Running in Docker
 
@@ -33,3 +41,6 @@
 
 ### Run the utility locally
 * ./fb_recover_keys.py `<backup zip file> <RSA recovery private key>` --prv
+
+### Run the utility locally utilising a YubiHSM device
+* ./fb_recover_keys.py --yubihsm-url `http://localhost:12345 <backup zip file> <hsm asymmetric key id>`  --prv
