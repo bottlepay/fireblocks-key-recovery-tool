@@ -59,50 +59,71 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument('backup', help='Backup zip file')
-    parser.add_argument('key', help='RSA private key file')
+    parser.add_argument('key', help='RSA private key file or YubiHSM Object ID')
+    parser.add_argument('--yubihsm-uri', default=None, help='Use a YubiHSM device (yhusb:// or http://localhost:12345)')
+    parser.add_argument('--yubihsm-authkey', default=1, help='The YubiHSM authkey ID to use')
     parser.add_argument('--prv', default=False,
                         action='store_const', const=True,
                         help='Reveal private key')
-    parser.add_argument('--mobile-key', help='mobile RSA private key file', default=None)
+    parser.add_argument('--mobile-key', help='mobile RSA private key file or YubiHSM Object ID', default=None)
     args = parser.parse_args()
 
     if not os.path.exists(args.backup):
         print('Backupfile: {} not found.'.format(args.backup))
         exit(- 1)
-    if not os.path.exists(args.key):
+    if not os.path.exists(args.key) and not args.yubihsm_uri:
         print('RSA key: {} not found.'.format(args.key))
         exit(-1)
-    
+
     mobile_key_pass = None
     passphrase = None
 
     if args.mobile_key is None:
         passphrase = getpass.getpass(prompt='Please enter mobile recovery passphrase:')
     else:
-        with open(args.mobile_key, 'r') as _key:
-            if 'ENCRYPTED' in _key.readlines()[1]:
-                mobile_key_pass = getpass.getpass(prompt='Please enter mobile recovery RSA private key passphrase:')
+        if not args.yubihsm_uri:
+            with open(args.mobile_key, 'r') as _key:
+                if 'ENCRYPTED' in _key.readlines()[1]:
+                    mobile_key_pass = getpass.getpass(prompt='Please enter mobile recovery RSA private key passphrase:')
 
-    with open(args.key, 'r') as _key:
-        if 'ENCRYPTED' in _key.readlines()[1]:
-            key_pass = getpass.getpass(prompt='Please enter recovery RSA private key passphrase:')
-        else:
-            key_pass = None
+    if not args.yubihsm_uri:
+        with open(args.key, 'r') as _key:
+            if 'ENCRYPTED' in _key.readlines()[1]:
+                key_pass = getpass.getpass(prompt='Please enter recovery RSA private key passphrase:')
+            else:
+                key_pass = None
+    else:
+        key_pass = getpass.getpass(prompt='Please enter YubiHSM authkey passphrase:')
 
     try:
         privkeys, chaincode = recover.restore_key_and_chaincode(
-            args.backup, args.key, passphrase, key_pass, args.mobile_key, mobile_key_pass)
+            args.backup, args.key, passphrase, key_pass, args.mobile_key, mobile_key_pass, args.yubihsm_uri, args.yubihsm_authkey)
     except recover.RecoveryErrorMobileKeyDecrypt:
-        print(colored("Failed to decrypt mobile Key. " + colored("Please make sure you have the mobile passphrase entered correctly.", attrs = ["bold"]), "cyan")) 
+        print(colored("Failed to decrypt mobile Key. " + colored("Please make sure you have the mobile passphrase entered correctly.", attrs = ["bold"]), "cyan"))
         exit(-1)
     except recover.RecoveryErrorRSAKeyImport:
-        print(colored("Failed to import RSA Key. " + colored("Please make sure you have the RSA passphrase entered correctly.", attrs = ["bold"]), "cyan")) 
+        print(colored("Failed to import RSA Key. " + colored("Please make sure you have the RSA passphrase entered correctly.", attrs = ["bold"]), "cyan"))
         exit(-1)
     except recover.RecoveryErrorMobileRSAKeyImport:
-        print(colored("Failed to import mobile RSA Key. " + colored("Please make sure you have the RSA passphrase entered correctly.", attrs = ["bold"]), "cyan")) 
+        print(colored("Failed to import mobile RSA Key. " + colored("Please make sure you have the RSA passphrase entered correctly.", attrs = ["bold"]), "cyan"))
         exit(-1)
     except recover.RecoveryErrorMobileRSADecrypt:
-        print(colored("Failed to decrypt mobile Key. " + colored("Please make sure you have the mobile private key entered correctly.", attrs = ["bold"]), "cyan")) 
+        print(colored("Failed to decrypt mobile Key. " + colored("Please make sure you have the mobile private key entered correctly.", attrs = ["bold"]), "cyan"))
+        exit(-1)
+    except recover.RecoveryErrorHSMAuthentication:
+        print(colored("Failed to authenticate with YubiHSM device. " + colored("Please make sure you have set the correct authkey ID, and entered the passphrase correctly.", attrs = ["bold"]), "cyan"))
+        exit(-1)
+    except recover.RecoveryErrorHSMConnection:
+        print(colored("Failed to connect to the YubiHSM device. " + colored("Please make sure you have set the correct USB or yubihsm-connector URI", attrs = ["bold"]), "cyan"))
+        exit(-1)
+    except recover.RecoveryErrorHSMKeyNotFound:
+        print(colored("Failed to locate the key on the YubiHSM device. " + colored("Please make sure you have set the correct Object ID (and --mobile-key if defined)", attrs = ["bold"]), "cyan"))
+        exit(-1)
+    except recover.RecoveryErrorHSMKeyInvalidAlgorithm:
+        print(colored("Failed to locate RSA key on the YubiHSM device. " + colored("Please make sure you have set the correct Object ID (and --mobile-key if defined)", attrs = ["bold"]), "cyan"))
+        exit(-1)
+    except recover.RecoveryErrorHSMAmbiguousMobileKey:
+        print(colored("Cannot specify both a mobile key and a passphrase. " + colored("Please omit --mobile-key when defining a mobile passphrase", attrs = ["bold"]), "cyan"))
         exit(-1)
 
     if (not chaincode or len(chaincode) != 32):
