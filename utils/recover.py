@@ -257,7 +257,7 @@ def restore_key_and_chaincode(zip_path, private_pem_path_or_hsm_id, passphrase, 
                 if mobile_key_info.algorithm != ALGORITHM.RSA_2048 and mobile_key_info.algorithm != ALGORITHM.RSA_3072 and mobile_key_info.algorithm != ALGORITHM.RSA_4096:
                     raise RecoveryErrorHSMKeyInvalidAlgorithm()
 
-                mobile_key_decrypt_func = lambda d: key.decrypt_oaep(d, hash=hashes.SHA1(), mgf_hash=hashes.SHA1())
+                mobile_key_decrypt_func = lambda d: key.decrypt_oaep(d, hash=hashes.SHA256(), mgf_hash=hashes.SHA256())
             except YubiHsmDeviceError as ex:
                 if ex.code == ERROR.OBJECT_NOT_FOUND:
                     raise RecoveryErrorHSMKeyNotFound()
