@@ -223,7 +223,7 @@ def restore_key_and_chaincode(zip_path, private_pem_path_or_hsm_id, passphrase, 
         try:
             # connect to the HSM using the provided authkey
             hsm = YubiHsm.connect(yubihsm_uri)
-            yubihsm_session = hsm.create_session_derived(yubihsm_authkey, key_pass)
+            yubihsm_session = hsm.create_session_derived(int(yubihsm_authkey), key_pass)
         except YubiHsmAuthenticationError:
             raise RecoveryErrorHSMAuthentication()
         except YubiHsmConnectionError:
